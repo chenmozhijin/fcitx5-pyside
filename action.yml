@@ -1,0 +1,78 @@
+name: Add fcitx5 support to PySide
+
+description: Add fcitx5 support to the PySide library or programs based on it
+
+inputs:
+  plugins-path:
+    description: The path to the Qt plugins directory
+    required: true
+
+  PySide-version:
+    description: The version of the PySide library (e.g. 6.7.3)
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get PySide version
+      id: get-pyside-version
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.PySide-version }}" ]; then
+          echo "PySide_Version=$(pip show PySide6-Essentials | grep Version | awk '{print $2}')" >> $GITHUB_OUTPUT
+        else
+          echo "PySide_Version=${{ inputs.PySide-version }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Install dependencies
+      shell: bash
+      run: | 
+        sudo apt-get update
+        sudo apt-get install -y build-essential clang cmake ninja-build extra-cmake-modules libfmt-dev libuv1-dev git libxkbcommon-dev libicu-dev gettext libgl1-mesa-dev libwayland-dev libvulkan-dev
+
+        python3 -m venv ${{ github.action_path }}/python-venv
+        source ${{ github.action_path }}/python-venv/bin/activate
+        pip install -U pip
+        pip install -U aqtinstall
+        python3 -m aqt install-qt linux desktop ${{ steps.get-pyside-version.outputs.PySide_Version }} --outputdir ${{ github.action_path }}/Qt --archives qtbase qtwayland icu
+
+    - name: clone fcitx5 and fcitx5-qt
+      shell: bash
+      run: |
+        git clone https://github.com/fcitx/fcitx5.git --depth 1 ${{ github.action_path }}/fcitx5
+        git clone https://github.com/fcitx/fcitx5-qt.git --depth 1 ${{ github.action_path }}/fcitx5-qt
+
+    - name: Cache fcitx5 data files
+      uses: actions/cache@v4
+      with:
+        path: '${{ github.action_path }}/fcitx5/**/*.tar.*'
+        key: fcitx5-${{ runner.os }}-${{ hashFiles('fcitx5/src/modules/spell/CMakeLists.txt') }}
+
+    - name: Build and Install fcitx5
+      shell: bash
+      run: |
+        cmake -G Ninja \
+              -S "${{ github.action_path }}/fcitx5" \
+              -B "${{ github.action_path }}/fcitx5"/build \
+              -DENABLE_KEYBOARD=Off -DENABLE_X11=Off -DENABLE_WAYLAND=Off -DENABLE_ENCHANT=Off \
+              -DENABLE_DBUS=Off -DENABLE_SERVER=Off -DENABLE_EMOJI=Off -DUSE_SYSTEMD=Off \
+              -DCMAKE_INSTALL_PREFIX="${{ github.action_path }}/install"
+        sudo cmake --build "${{ github.action_path }}/fcitx5"/build -j
+        sudo cmake --install "${{ github.action_path }}/fcitx5"/build
+
+    - name: Build and Install fcitx5-qt
+      shell: bash
+      run: |
+        cmake -G Ninja \
+              -S "${{ github.action_path }}/fcitx5-qt" \
+              -B "${{ github.action_path }}/fcitx5-qt"/build \
+              -DENABLE_QT4=Off -DENABLE_QT5=off -DENABLE_QT6=On -DBUILD_ONLY_PLUGIN=On \
+              -DCMAKE_PREFIX_PATH=${{ github.action_path }}/Qt/${{ steps.get-pyside-version.outputs.PySide_Version }}/gcc_64/lib/cmake \
+              -DCMAKE_INSTALL_PREFIX="${{ github.action_path }}/install"
+        sudo cmake --build "${{ github.action_path }}/fcitx5-qt"/build -j
+        sudo cmake --install "${{ github.action_path }}/fcitx5-qt"/build
+
+    - name: Copy
+      shell: bash
+      run: |
+        mkdir -p ${{ inputs.plugins-path }}/platforminputcontexts
+        cp -vfp ${{ github.action_path }}/Qt/${{ steps.get-pyside-version.outputs.PySide_Version }}/gcc_64/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so ${{ inputs.plugins-path }}/platforminputcontexts/
