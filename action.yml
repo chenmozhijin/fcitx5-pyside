@@ -41,12 +41,6 @@ runs:
         git clone https://github.com/fcitx/fcitx5.git --depth 1 ${{ github.action_path }}/fcitx5
         git clone https://github.com/fcitx/fcitx5-qt.git --depth 1 ${{ github.action_path }}/fcitx5-qt
 
-    - name: Cache fcitx5 data files
-      uses: actions/cache@v4
-      with:
-        path: '${{ github.action_path }}/fcitx5/**/*.tar.*'
-        key: fcitx5-${{ runner.os }}-${{ hashFiles('fcitx5/src/modules/spell/CMakeLists.txt') }}
-
     - name: Build and Install fcitx5
       shell: bash
       run: |
