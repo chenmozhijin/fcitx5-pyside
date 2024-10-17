@@ -18,7 +18,7 @@ runs:
       shell: bash
       run: |
         if [ -z "${{ inputs.PySide-version }}" ]; then
-          echo "PySide_Version=$(pip show PySide6-Essentials | grep Version | awk '{print $2}')" >> $GITHUB_OUTPUT
+          echo "PySide_Version=$(pip show PySide6-Essentials | grep Version | awk '{print $2}' | cut -d. -f1-3)" >> $GITHUB_OUTPUT
         else
           echo "PySide_Version=${{ inputs.PySide-version }}" >> $GITHUB_OUTPUT
         fi
