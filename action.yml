@@ -24,6 +24,7 @@ runs:
         fi
 
     - name: Install dependencies
+      id: install-dependencies
       shell: bash
       run: | 
         sudo apt-get update
@@ -37,8 +38,10 @@ runs:
         arch=$(uname -m)
         if [[ "$arch" == "x86_64" ]]; then
           python3 -m aqt install-qt linux desktop ${{ steps.get-pyside-version.outputs.PySide_Version }} --outputdir ${{ github.action_path }}/Qt --archives qtbase qtwayland icu
+          echo "arch=gcc_64" >> $GITHUB_OUTPUT
         elif [[ "$arch" == "aarch64" ]]; then
           python3 -m aqt install-qt linux_arm64 desktop ${{ steps.get-pyside-version.outputs.PySide_Version }} --outputdir ${{ github.action_path }}/Qt --archives qtbase qtwayland icu
+          echo "arch=gcc_arm64" >> $GITHUB_OUTPUT
         fi
 
     - name: clone fcitx5 and fcitx5-qt
@@ -62,17 +65,11 @@ runs:
     - name: Build and Install fcitx5-qt
       shell: bash
       run: |
-        arch=$(uname -m)
-        if [[ "$arch" == "x86_64" ]]; then
-          PREFIX_PATH=${{ github.action_path }}/Qt/${{ steps.get-pyside-version.outputs.PySide_Version }}/gcc_64/lib/cmake
-        elif [[ "$arch" == "aarch64" ]]; then
-          PREFIX_PATH=${{ github.action_path }}/Qt/${{ steps.get-pyside-version.outputs.PySide_Version }}/gcc_arm64/lib/cmake
-        fi
         cmake -G Ninja \
               -S "${{ github.action_path }}/fcitx5-qt" \
               -B "${{ github.action_path }}/fcitx5-qt"/build \
               -DENABLE_QT4=Off -DENABLE_QT5=off -DENABLE_QT6=On -DBUILD_ONLY_PLUGIN=On \
-              -DCMAKE_PREFIX_PATH=$PREFIX_PATH \
+              -DCMAKE_PREFIX_PATH=${{ github.action_path }}/Qt/${{ steps.get-pyside-version.outputs.PySide_Version }}/{{ steps.install-dependencies.outputs.arch }}/lib/cmake \
               -DCMAKE_INSTALL_PREFIX="${{ github.action_path }}/install"
         sudo cmake --build "${{ github.action_path }}/fcitx5-qt"/build -j
         sudo cmake --install "${{ github.action_path }}/fcitx5-qt"/build
@@ -81,4 +78,4 @@ runs:
       shell: bash
       run: |
         mkdir -p ${{ inputs.plugins-path }}/platforminputcontexts
-        cp -vfp ${{ github.action_path }}/Qt/${{ steps.get-pyside-version.outputs.PySide_Version }}/gcc_64/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so ${{ inputs.plugins-path }}/platforminputcontexts/
+        cp -vfp ${{ github.action_path }}/Qt/${{ steps.get-pyside-version.outputs.PySide_Version }}/{{ steps.install-dependencies.outputs.arch }}/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so ${{ inputs.plugins-path }}/platforminputcontexts/
