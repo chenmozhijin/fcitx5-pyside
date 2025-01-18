@@ -69,7 +69,7 @@ runs:
               -S "${{ github.action_path }}/fcitx5-qt" \
               -B "${{ github.action_path }}/fcitx5-qt"/build \
               -DENABLE_QT4=Off -DENABLE_QT5=off -DENABLE_QT6=On -DBUILD_ONLY_PLUGIN=On \
-              -DCMAKE_PREFIX_PATH=${{ github.action_path }}/Qt/${{ steps.get-pyside-version.outputs.PySide_Version }}/{{ steps.install-dependencies.outputs.arch }}/lib/cmake \
+              -DCMAKE_PREFIX_PATH=${{ github.action_path }}/Qt/${{ steps.get-pyside-version.outputs.PySide_Version }}/${{ steps.install-dependencies.outputs.arch }}/lib/cmake \
               -DCMAKE_INSTALL_PREFIX="${{ github.action_path }}/install"
         sudo cmake --build "${{ github.action_path }}/fcitx5-qt"/build -j
         sudo cmake --install "${{ github.action_path }}/fcitx5-qt"/build
@@ -78,4 +78,4 @@ runs:
       shell: bash
       run: |
         mkdir -p ${{ inputs.plugins-path }}/platforminputcontexts
-        cp -vfp ${{ github.action_path }}/Qt/${{ steps.get-pyside-version.outputs.PySide_Version }}/{{ steps.install-dependencies.outputs.arch }}/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so ${{ inputs.plugins-path }}/platforminputcontexts/
+        cp -vfp ${{ github.action_path }}/Qt/${{ steps.get-pyside-version.outputs.PySide_Version }}/${{ steps.install-dependencies.outputs.arch }}/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so ${{ inputs.plugins-path }}/platforminputcontexts/
