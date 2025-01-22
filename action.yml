@@ -1,6 +1,10 @@
 name: Add fcitx5 support to PySide
 
 description: Add fcitx5 support to the PySide library or programs based on it
+author: "chenmozhijin"
+branding:
+  icon: package
+  color: green
 
 inputs:
   plugins-path:
