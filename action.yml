@@ -32,7 +32,7 @@ runs:
       shell: bash
       run: | 
         sudo apt-get update
-        sudo apt-get install -y build-essential clang cmake ninja-build extra-cmake-modules libfmt-dev libuv1-dev git libxkbcommon-dev libicu-dev gettext libgl1-mesa-dev libwayland-dev libvulkan-dev uuid-dev itstool gettext
+        sudo apt-get install -y build-essential clang cmake ninja-build extra-cmake-modules libfmt-dev libuv1-dev git libxkbcommon-dev libicu-dev gettext libgl1-mesa-dev libwayland-dev libvulkan-dev uuid-dev itstool gettext appstream
 
         python3 -m venv ${{ github.action_path }}/python-venv
         source ${{ github.action_path }}/python-venv/bin/activate
