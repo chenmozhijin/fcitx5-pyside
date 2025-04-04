@@ -48,6 +48,22 @@ runs:
           echo "arch=gcc_arm64" >> $GITHUB_OUTPUT
         fi
 
+        GCC_MAJOR_VERSION=$(gcc --version | grep -oP '(?<= )[0-9]+(?=\.)' | head -1)
+        echo "Current GCC major version: $GCC_MAJOR_VERSION"
+    
+        # 根据版本决定安装
+        if [ "$GCC_MAJOR_VERSION" -lt 11 ]; then
+            echo "Installing GCC 11..."
+            sudo apt-get install -y g++-11
+            CXX_COMPILER=/usr/bin/g++-11
+        else
+            echo "Using existing GCC $GCC_MAJOR_VERSION"
+            CXX_COMPILER=/usr/bin/g++
+        fi
+    
+        # 将编译器路径存入环境变量
+        echo "CXX_COMPILER=$CXX_COMPILER" >> $GITHUB_ENV
+
     - name: clone fcitx5 and fcitx5-qt
       shell: bash
       run: |
