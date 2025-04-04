@@ -58,7 +58,7 @@ runs:
             sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
             sudo apt-get update
             sudo apt-get install -y gcc-13 g++-13
-            CXX_COMPILER=/usr/bin/g++-11
+            CXX_COMPILER=/usr/bin/g++-13
         else
             echo "Using existing GCC $GCC_MAJOR_VERSION"
             CXX_COMPILER=/usr/bin/g++
@@ -80,6 +80,7 @@ runs:
     - name: Build and Install fcitx5
       shell: bash
       run: |
+        export CXX=${{ env.CXX_COMPILER }}
         cmake -G Ninja \
               -S "${{ github.action_path }}/fcitx5" \
               -B "${{ github.action_path }}/fcitx5"/build \
@@ -92,6 +93,7 @@ runs:
     - name: Build and Install fcitx5-qt
       shell: bash
       run: |
+        export CXX=${{ env.CXX_COMPILER }}
         cmake -G Ninja \
               -S "${{ github.action_path }}/fcitx5-qt" \
               -B "${{ github.action_path }}/fcitx5-qt"/build \
