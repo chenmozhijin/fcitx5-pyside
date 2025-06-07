@@ -32,7 +32,7 @@ runs:
       shell: bash
       run: | 
         sudo apt-get update
-        sudo apt-get install -y build-essential clang cmake ninja-build extra-cmake-modules libfmt-dev libuv1-dev git libxkbcommon-dev libicu-dev gettext libgl1-mesa-dev libwayland-dev libvulkan-dev uuid-dev itstool gettext appstream software-properties-common
+        sudo apt-get install -y build-essential clang cmake ninja-build extra-cmake-modules libfmt-dev libuv1-dev git libxkbcommon-dev libicu-dev gettext libgl1-mesa-dev libwayland-dev libvulkan-dev uuid-dev itstool gettext appstream software-properties-common sed
 
         python3 -m venv ${{ github.action_path }}/python-venv
         source ${{ github.action_path }}/python-venv/bin/activate
@@ -53,12 +53,13 @@ runs:
       if: true == false
       run: |
         echo "==> Checking and installing GCC 13..."
-        GCC_MAJOR_VERSION=$(gcc --version | grep -oP '(?<=^gcc \(.*\)\s)[0-9]+' | head -1 || echo "0")
+
+        GCC_MAJOR_VERSION=$(gcc --version | head -n1 | sed -E 's/^gcc \(.*\) ([0-9]+)\..*/\1/' || echo "0")
         echo "-> Current GCC major version: $GCC_MAJOR_VERSION"
 
         if [ "$GCC_MAJOR_VERSION" -lt 13 ]; then
           echo "-> GCC version is older than 13. Proceeding with installation."
-          
+
           # shellcheck source=/dev/null
           . /etc/os-release
           echo "-> Detected OS: $ID $VERSION_ID ($VERSION_CODENAME)"
@@ -73,10 +74,21 @@ runs:
                   sudo apt-get install -y gcc-13 g++-13
                   ;;
                 bullseye) # Debian 11
-                  echo "--> Detected Debian 11 (bullseye). Adding backports to install gcc-13."
-                  echo 'deb http://deb.debian.org/debian bullseye-backports main' | sudo tee /etc/apt/sources.list.d/backports.list
+                  echo "--> Detected Debian 11 (bullseye). This requires adding the 'testing' repository."
+                  echo "!!! WARNING: Installing packages from 'testing' on a stable release carries risks."
+
+                  # 1. 添加 testing 仓库
+                  echo "deb http://deb.debian.org/debian testing main" | sudo tee /etc/apt/sources.list.d/testing.list
+
+                  # 2. 配置 APT Pinning，防止系统被整体升级到 testing
+                  echo "Package: *" | sudo tee /etc/apt/preferences.d/99-testing-gcc
+                  echo "Pin: release a=testing" | sudo tee -a /etc/apt/preferences.d/99-testing-gcc
+                  echo "Pin-Priority: 100" | sudo tee -a /etc/apt/preferences.d/99-testing-gcc
+
+                  # 3. 更新源并使用 -t testing 标志来指定安装源
                   sudo apt-get update
-                  sudo apt-get install -y -t bullseye-backports gcc-13 g++-13
+                  echo "--> Installing gcc-13/g++-13 from the 'testing' repository..."
+                  sudo apt-get install -y -t testing gcc-13 g++-13
                   ;;
                 *)
                   echo "::error::Unsupported Debian version: '$VERSION_CODENAME'. This script only supports 'bookworm' (12) and 'bullseye' (11)."
@@ -95,7 +107,7 @@ runs:
               exit 1
               ;;
           esac
-          
+
           CXX_COMPILER=/usr/bin/g++-13
         else
           echo "-> GCC version $GCC_MAJOR_VERSION is sufficient. Using system default C++ compiler."
@@ -106,7 +118,7 @@ runs:
 
         echo "-> Selected C++ compiler path: $CXX_COMPILER"
         echo "-> Verifying compiler version:"
-        $CXX_COMPILER --version
+        "$CXX_COMPILER" --version
 
     - name: clone fcitx5 and fcitx5-qt
       shell: bash
