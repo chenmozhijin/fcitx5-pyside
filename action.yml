@@ -32,7 +32,7 @@ runs:
       shell: bash
       run: | 
         sudo apt-get update
-        sudo apt-get install -y build-essential clang cmake ninja-build extra-cmake-modules libfmt-dev libuv1-dev git libxkbcommon-dev libicu-dev gettext libgl1-mesa-dev libwayland-dev libvulkan-dev uuid-dev itstool gettext appstream software-properties-common sed
+        sudo apt-get install -y build-essential clang cmake ninja-build extra-cmake-modules libfmt-dev libuv1-dev git libxkbcommon-dev libicu-dev gettext libgl1-mesa-dev libwayland-dev libvulkan-dev uuid-dev itstool gettext appstream software-properties-common
 
         python3 -m venv ${{ github.action_path }}/python-venv
         source ${{ github.action_path }}/python-venv/bin/activate
@@ -48,81 +48,28 @@ runs:
           echo "arch=gcc_arm64" >> $GITHUB_OUTPUT
         fi
 
-    - name: Install GCC 13
-      shell: bash
-      run: |
-        echo "==> Checking and installing GCC 13..."
-
-        GCC_MAJOR_VERSION=$(gcc --version | head -n1 | sed -E 's/^gcc \(.*\) ([0-9]+)\..*/\1/' || echo "0")
-        echo "-> Current GCC major version: $GCC_MAJOR_VERSION"
-
+        GCC_MAJOR_VERSION=$(gcc --version | grep -oP '(?<= )[0-9]+(?=\.)' | head -1)
+        echo "Current GCC major version: $GCC_MAJOR_VERSION"
+    
+        # 根据版本决定安装
         if [ "$GCC_MAJOR_VERSION" -lt 13 ]; then
-          echo "-> GCC version is older than 13. Proceeding with installation."
-
-          # shellcheck source=/dev/null
-          . /etc/os-release
-          echo "-> Detected OS: $ID $VERSION_ID ($VERSION_CODENAME)"
-
-          case "$ID" in
-            debian)
-              echo "--> Configuring for Debian..."
-              case "$VERSION_CODENAME" in
-                bookworm) # Debian 12
-                  echo "--> Detected Debian 12 (bookworm). Installing gcc-13 from the main repository."
-                  sudo apt-get update
-                  sudo apt-get install -y gcc-13 g++-13
-                  ;;
-                bullseye) # Debian 11
-                  echo "--> Detected Debian 11 (bullseye). This requires adding the 'testing' repository."
-                  echo "!!! WARNING: Installing packages from 'testing' on a stable release carries risks."
-
-                  # 1. 添加 testing 仓库
-                  echo "deb http://deb.debian.org/debian testing main" | sudo tee /etc/apt/sources.list.d/testing.list
-
-                  # 2. 配置 APT Pinning，防止系统被整体升级到 testing
-                  echo "Package: *" | sudo tee /etc/apt/preferences.d/99-testing-gcc
-                  echo "Pin: release a=testing" | sudo tee -a /etc/apt/preferences.d/99-testing-gcc
-                  echo "Pin-Priority: 100" | sudo tee -a /etc/apt/preferences.d/99-testing-gcc
-
-                  # 3. 更新源并使用 -t testing 标志来指定安装源
-                  sudo apt-get update
-
-                  export DEBIAN_FRONTEND=noninteractive
-                  echo "--> Installing 'usrmerge' to enable merged-/usr layout..."
-                  sudo apt-get install -y usrmerge
-
-                  echo "--> Installing gcc-13/g++-13 from the 'testing' repository..."
-                  sudo apt-get install -y -t testing gcc-13 g++-13
-                  ;;
-                *)
-                  echo "::error::Unsupported Debian version: '$VERSION_CODENAME'. This script only supports 'bookworm' (12) and 'bullseye' (11)."
-                  exit 1
-                  ;;
-              esac
-              ;;
-            ubuntu)
-              echo "--> Configuring for Ubuntu. Adding PPA ppa:ubuntu-toolchain-r/test."
-              sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-              sudo apt-get update
-              sudo apt-get install -y gcc-13 g++-13
-              ;;
-            *)
-              echo "::error::Unsupported operating system for GCC 13 installation: '$ID'. This script supports Debian and Ubuntu."
-              exit 1
-              ;;
-          esac
-
-          CXX_COMPILER=/usr/bin/g++-13
+            echo "Installing GCC 13..."
+            # 添加Ubuntu Toolchain PPA获取新编译器
+            sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+            sudo apt-get update
+            sudo apt-get install -y gcc-13 g++-13
+            CXX_COMPILER=/usr/bin/g++-13
         else
-          echo "-> GCC version $GCC_MAJOR_VERSION is sufficient. Using system default C++ compiler."
-          CXX_COMPILER=/usr/bin/g++
+            echo "Using existing GCC $GCC_MAJOR_VERSION"
+            CXX_COMPILER=/usr/bin/g++
         fi
-
+    
+        # 将编译器路径存入环境变量
         echo "CXX_COMPILER=$CXX_COMPILER" >> $GITHUB_ENV
 
-        echo "-> Selected C++ compiler path: $CXX_COMPILER"
-        echo "-> Verifying compiler version:"
-        "$CXX_COMPILER" --version
+        # 验证编译器版本
+        echo "Selected compiler info:"
+        $CXX_COMPILER --version
 
     - name: clone fcitx5 and fcitx5-qt
       shell: bash
