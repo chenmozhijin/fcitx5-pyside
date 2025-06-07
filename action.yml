@@ -50,7 +50,6 @@ runs:
 
     - name: Install GCC 13
       shell: bash
-      if: true == false
       run: |
         echo "==> Checking and installing GCC 13..."
 
