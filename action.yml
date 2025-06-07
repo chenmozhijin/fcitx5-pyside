@@ -71,7 +71,7 @@ runs:
         make -j$(nproc)
         sudo make install
 
-    # 步骤 4: 确定并输出编译器路径 (使用 outputs)
+    # 步骤 4: 确定并输出编译器路径
     - name: Determine Compiler Path
       id: get-compiler
       shell: bash
@@ -96,7 +96,7 @@ runs:
         fi
         echo "cxx_compiler=$CXX_PATH" >> $GITHUB_OUTPUT
 
-    # 步骤 5: 安装 Qt (保持不变)
+    # 步骤 5: 安装 Qt
     - name: Install Qt via aqtinstall
       id: install-qt
       shell: bash
@@ -113,7 +113,7 @@ runs:
           echo "arch=gcc_arm64" >> $GITHUB_OUTPUT
         fi
 
-    # 步骤 6: 克隆 fcitx5 仓库 (保持不变)
+    # 步骤 6: 克隆 fcitx5 仓库
     - name: Clone fcitx5 and fcitx5-qt
       shell: bash
       run: |
@@ -153,4 +153,4 @@ runs:
       shell: bash
       run: |
         sudo mkdir -p ${{ inputs.plugins-path }}/platforminputcontexts
-        sudo cp -vfp ${{ github.action_path }}/install/lib/fcitx5-qt6/platforminputcontexts/libfcitx5platforminputcontextplugin.so ${{ inputs.plugins-path }}/platforminputcontexts/
+        sudo cp -vfp ${{ github.action_path }}/Qt/${{ steps.get-pyside-version.outputs.PySide_Version }}/${{ steps.install-qt.outputs.arch }}/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so ${{ inputs.plugins-path }}/platforminputcontexts/
