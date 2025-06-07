@@ -7,10 +7,18 @@ on:
 
 jobs:
   build:
+    container: ${{ matrix.container }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-22.04, ubuntu-20.04, ubuntu-24.04-arm]
+        os: [ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm]
+        include:
+          - os: ubuntu-latest
+            container: 
+              image: debian:11
+              volumes:
+                - /home/runner/work:/home/runner/work
+
 
     runs-on: ${{ matrix.os }}
     steps:
