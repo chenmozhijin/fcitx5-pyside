@@ -86,6 +86,10 @@ runs:
 
                   # 3. 更新源并使用 -t testing 标志来指定安装源
                   sudo apt-get update
+
+                  echo "--> Installing 'usrmerge' to enable merged-/usr layout..."
+                  sudo apt-get install -y usrmerge
+
                   echo "--> Installing gcc-13/g++-13 from the 'testing' repository..."
                   sudo apt-get install -y -t testing gcc-13 g++-13
                   ;;
