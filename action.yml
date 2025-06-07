@@ -32,7 +32,7 @@ runs:
       shell: bash
       run: | 
         sudo apt-get update
-        sudo apt-get install -y build-essential clang cmake ninja-build extra-cmake-modules libfmt-dev libuv1-dev git libxkbcommon-dev libicu-dev gettext libgl1-mesa-dev libwayland-dev libvulkan-dev uuid-dev itstool gettext appstream software-properties-common
+        sudo apt-get install -y build-essential clang cmake ninja-build extra-cmake-modules libfmt-dev libuv1-dev git libxkbcommon-dev libicu-dev gettext libgl1-mesa-dev libwayland-dev libvulkan-dev uuid-dev itstool gettext appstream software-properties-common curl gpg
 
         python3 -m venv ${{ github.action_path }}/python-venv
         source ${{ github.action_path }}/python-venv/bin/activate
@@ -53,11 +53,34 @@ runs:
     
         # 根据版本决定安装
         if [ "$GCC_MAJOR_VERSION" -lt 13 ]; then
-            echo "Installing GCC 13..."
-            # 添加Ubuntu Toolchain PPA获取新编译器
-            sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-            sudo apt-get update
-            sudo apt-get install -y gcc-13 g++-13
+            echo "GCC version is older than 13. Installing GCC 13..."
+            
+            # shellcheck source=/dev/null
+            . /etc/os-release
+            echo "Detected OS: $ID ($VERSION_CODENAME)"
+
+            case "$ID" in
+              debian)
+                echo "-> Running on Debian. Manually configuring Ubuntu PPA for GCC 13."
+                KEYSERVER=keyserver.ubuntu.com
+                PPA_KEY=BA9EF27F
+                sudo gpg --no-default-keyring --keyring /usr/share/keyrings/ubuntu-toolchain-r.gpg --keyserver $KEYSERVER --recv-keys $PPA_KEY
+                echo "deb [signed-by=/usr/share/keyrings/ubuntu-toolchain-r.gpg] http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu jammy main" | sudo tee /etc/apt/sources.list.d/ubuntu-toolchain-r.list
+                sudo apt-get update
+                sudo apt-get install -y gcc-13 g++-13
+                ;;
+              ubuntu)
+                echo "-> Running on Ubuntu. Using standard 'add-apt-repository'."
+                sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+                sudo apt-get update
+                sudo apt-get install -y gcc-13 g++-13
+                ;;
+              *)
+                echo "::error::Unsupported operating system for GCC 13 installation: '$ID'. This script supports Debian and Ubuntu."
+                exit 1
+                ;;
+            esac
+            
             CXX_COMPILER=/usr/bin/g++-13
         else
             echo "Using existing GCC $GCC_MAJOR_VERSION"
