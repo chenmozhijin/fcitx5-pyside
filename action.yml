@@ -48,27 +48,60 @@ runs:
           echo "arch=gcc_arm64" >> $GITHUB_OUTPUT
         fi
 
-        GCC_MAJOR_VERSION=$(gcc --version | grep -oP '(?<= )[0-9]+(?=\.)' | head -1)
-        echo "Current GCC major version: $GCC_MAJOR_VERSION"
-    
-        # 根据版本决定安装
+        echo "==> Checking and installing GCC 13..."
+        GCC_MAJOR_VERSION=$(gcc --version | grep -oP '(?<=^gcc \(.*\)\s)[0-9]+' | head -1 || echo "0")
+        echo "-> Current GCC major version: $GCC_MAJOR_VERSION"
+
         if [ "$GCC_MAJOR_VERSION" -lt 13 ]; then
-            echo "Installing GCC 13..."
-            # 添加Ubuntu Toolchain PPA获取新编译器
-            sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-            sudo apt-get update
-            sudo apt-get install -y gcc-13 g++-13
-            CXX_COMPILER=/usr/bin/g++-13
+          echo "-> GCC version is older than 13. Proceeding with installation."
+          
+          # shellcheck source=/dev/null
+          . /etc/os-release
+          echo "-> Detected OS: $ID $VERSION_ID ($VERSION_CODENAME)"
+
+          case "$ID" in
+            debian)
+              echo "--> Configuring for Debian..."
+              case "$VERSION_CODENAME" in
+                bookworm) # Debian 12
+                  echo "--> Detected Debian 12 (bookworm). Installing gcc-13 from the main repository."
+                  sudo apt-get update
+                  sudo apt-get install -y gcc-13 g++-13
+                  ;;
+                bullseye) # Debian 11
+                  echo "--> Detected Debian 11 (bullseye). Adding backports to install gcc-13."
+                  echo 'deb http://deb.debian.org/debian bullseye-backports main' | sudo tee /etc/apt/sources.list.d/backports.list
+                  sudo apt-get update
+                  sudo apt-get install -y -t bullseye-backports gcc-13 g++-13
+                  ;;
+                *)
+                  echo "::error::Unsupported Debian version: '$VERSION_CODENAME'. This script only supports 'bookworm' (12) and 'bullseye' (11)."
+                  exit 1
+                  ;;
+              esac
+              ;;
+            ubuntu)
+              echo "--> Configuring for Ubuntu. Adding PPA ppa:ubuntu-toolchain-r/test."
+              sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+              sudo apt-get update
+              sudo apt-get install -y gcc-13 g++-13
+              ;;
+            *)
+              echo "::error::Unsupported operating system for GCC 13 installation: '$ID'. This script supports Debian and Ubuntu."
+              exit 1
+              ;;
+          esac
+          
+          CXX_COMPILER=/usr/bin/g++-13
         else
-            echo "Using existing GCC $GCC_MAJOR_VERSION"
-            CXX_COMPILER=/usr/bin/g++
+          echo "-> GCC version $GCC_MAJOR_VERSION is sufficient. Using system default C++ compiler."
+          CXX_COMPILER=/usr/bin/g++
         fi
-    
-        # 将编译器路径存入环境变量
+
         echo "CXX_COMPILER=$CXX_COMPILER" >> $GITHUB_ENV
 
-        # 验证编译器版本
-        echo "Selected compiler info:"
+        echo "-> Selected C++ compiler path: $CXX_COMPILER"
+        echo "-> Verifying compiler version:"
         $CXX_COMPILER --version
 
     - name: clone fcitx5 and fcitx5-qt
