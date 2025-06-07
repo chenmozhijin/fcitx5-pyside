@@ -62,9 +62,10 @@ runs:
             case "$ID" in
               debian)
                 echo "-> Running on Debian. Manually configuring Ubuntu PPA for GCC 13."
-                KEYSERVER=keyserver.ubuntu.com
-                PPA_KEY=BA9EF27F
-                sudo gpg --no-default-keyring --keyring /usr/share/keyrings/ubuntu-toolchain-r.gpg --keyserver $KEYSERVER --recv-keys $PPA_KEY
+                PPA_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x60C317803A41BA51845E371A1E9377A2BA9EF27F"
+                echo "-> Downloading GPG key from $PPA_KEY_URL"
+                curl -s "$PPA_KEY_URL" | sudo gpg --dearmor -o /usr/share/keyrings/ubuntu-toolchain-r.gpg
+
                 echo "deb [signed-by=/usr/share/keyrings/ubuntu-toolchain-r.gpg] http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu jammy main" | sudo tee /etc/apt/sources.list.d/ubuntu-toolchain-r.list
                 sudo apt-get update
                 sudo apt-get install -y gcc-13 g++-13
