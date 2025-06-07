@@ -27,17 +27,27 @@ runs:
           echo "PySide_Version=${{ inputs.PySide-version }}" >> $GITHUB_OUTPUT
         fi
 
-    - name: Install dependencies
+
+    - name: Install common dependencies and detect OS
       id: install-dependencies
       shell: bash
-      run: | 
+      run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential clang cmake ninja-build extra-cmake-modules libfmt-dev libuv1-dev git libxkbcommon-dev libicu-dev gettext libgl1-mesa-dev libwayland-dev libvulkan-dev uuid-dev itstool gettext appstream software-properties-common curl gpg
+        # 安装所有分支都需要的通用依赖，以及 Debian 编译 GCC 所需的依赖
+        sudo apt-get install -y \
+          build-essential clang cmake ninja-build extra-cmake-modules \
+          libfmt-dev libuv1-dev git libxkbcommon-dev libicu-dev gettext \
+          libgl1-mesa-dev libwayland-dev libvulkan-dev uuid-dev itstool \
+          gettext appstream software-properties-common curl gpg \
+          libgmp-dev libmpfr-dev libmpc-dev wget bzip2 xz-utils file \
+          python3-venv python3-pip
 
-        python3 -m venv ${{ github.action_path }}/python-venv
-        source ${{ github.action_path }}/python-venv/bin/activate
-        pip install -U pip
-        pip install -U aqtinstall
+        # 检测 OS 并将信息输出到 GITHUB_ENV 供后续步骤使用
+        # shellcheck source=/dev/null
+        . /etc/os-release
+        echo "OS_ID=$ID" >> $GITHUB_ENV
+        echo "OS_VERSION_CODENAME=$VERSION_CODENAME" >> $GITHUB_ENV
+        echo "Detected OS: $ID ($VERSION_CODENAME)"
 
         arch=$(uname -m)
         if [[ "$arch" == "x86_64" ]]; then
@@ -48,54 +58,82 @@ runs:
           echo "arch=gcc_arm64" >> $GITHUB_OUTPUT
         fi
 
-        GCC_MAJOR_VERSION=$(gcc --version | grep -oP '(?<= )[0-9]+(?=\.)' | head -1)
-        echo "Current GCC major version: $GCC_MAJOR_VERSION"
-    
-        # 根据版本决定安装
+
+    - name: Install GCC 13 for Ubuntu
+      if: env.OS_ID == 'ubuntu'
+      shell: bash
+      run: |
+        GCC_MAJOR_VERSION=$(gcc --version | head -n1 | sed -E 's/.* ([0-9]+)\..*/\1/')
         if [ "$GCC_MAJOR_VERSION" -lt 13 ]; then
-            echo "GCC version is older than 13. Installing GCC 13..."
-            
-            # shellcheck source=/dev/null
-            . /etc/os-release
-            echo "Detected OS: $ID ($VERSION_CODENAME)"
-
-            case "$ID" in
-              debian)
-                echo "-> Running on Debian. Manually configuring Ubuntu PPA for GCC 13."
-                PPA_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x60C317803A41BA51845E371A1E9377A2BA9EF27F"
-                echo "-> Downloading GPG key from $PPA_KEY_URL"
-                curl -s "$PPA_KEY_URL" | sudo gpg --dearmor -o /usr/share/keyrings/ubuntu-toolchain-r.gpg
-
-                echo "deb [signed-by=/usr/share/keyrings/ubuntu-toolchain-r.gpg] http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu focal main" | sudo tee /etc/apt/sources.list.d/ubuntu-toolchain-r.list
-                sudo apt-get update
-                sudo apt-get install -y gcc-13 g++-13
-                ;;
-              ubuntu)
-                echo "-> Running on Ubuntu. Using standard 'add-apt-repository'."
-                sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-                sudo apt-get update
-                sudo apt-get install -y gcc-13 g++-13
-                ;;
-              *)
-                echo "::error::Unsupported operating system for GCC 13 installation: '$ID'. This script supports Debian and Ubuntu."
-                exit 1
-                ;;
-            esac
-            
-            CXX_COMPILER=/usr/bin/g++-13
+            echo "-> Running on Ubuntu. Installing GCC 13 via PPA..."
+            sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+            sudo apt-get update
+            sudo apt-get install -y gcc-13 g++-13
         else
-            echo "Using existing GCC $GCC_MAJOR_VERSION"
-            CXX_COMPILER=/usr/bin/g++
+            echo "-> GCC version $GCC_MAJOR_VERSION is sufficient."
         fi
-    
-        # 将编译器路径存入环境变量
-        echo "CXX_COMPILER=$CXX_COMPILER" >> $GITHUB_ENV
 
-        # 验证编译器版本
-        echo "Selected compiler info:"
-        $CXX_COMPILER --version
+    - name: Cache or Compile GCC 13 for Debian
+      if: env.OS_ID == 'debian'
+      id: compile-gcc-debian
+      uses: actions/cache@v4
+      with:
+        path: /opt/gcc-13.2.0
+        key: gcc-13.2.0-debian-${{ env.OS_VERSION_CODENAME }}
 
-    - name: clone fcitx5 and fcitx5-qt
+    - name: Compile GCC 13 on Debian if not cached
+      if: steps.compile-gcc-debian.outputs.cache-hit != 'true' && env.OS_ID == 'debian'
+      shell: bash
+      run: |
+        echo "-> Running on Debian. GCC 13 not found in cache. Compiling from source..."
+        GCC_VERSION="13.2.0"
+        INSTALL_DIR="/opt/gcc-${GCC_VERSION}"
+        cd /tmp
+        wget https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.gz
+        tar -xf gcc-${GCC_VERSION}.tar.gz
+        cd gcc-${GCC_VERSION}
+        ./contrib/download_prerequisites
+        mkdir build && cd build
+        ../configure --prefix="$INSTALL_DIR" --enable-languages=c,c++ --disable-multilib --disable-bootstrap
+        make -j$(nproc)
+        sudo make install
+
+    - name: Set Compiler Environment
+      id: set-compiler
+      shell: bash
+      run: |
+        if [ "${{ env.OS_ID }}" == "debian" ]; then
+            GCC_PATH="/opt/gcc-13.2.0/bin"
+            echo "Setting up custom compiled GCC from $GCC_PATH"
+            echo "$GCC_PATH" | sudo tee -a $GITHUB_PATH
+            echo "CXX_COMPILER=$GCC_PATH/g++" >> $GITHUB_ENV
+        else # Ubuntu
+            GCC_MAJOR_VERSION=$(gcc --version | head -n1 | sed -E 's/.* ([0-9]+)\..*/\1/')
+            if [ "$GCC_MAJOR_VERSION" -lt 13 ]; then
+                echo "Setting up GCC 13 from PPA"
+                echo "CXX_COMPILER=/usr/bin/g++-13" >> $GITHUB_ENV
+            else
+                echo "Setting up system GCC $GCC_MAJOR_VERSION"
+                echo "CXX_COMPILER=/usr/bin/g++" >> $GITHUB_ENV
+            fi
+        fi
+        
+    - name: Verify selected compiler
+      shell: bash
+      run: |
+        echo "Selected CXX compiler is ${{ env.CXX_COMPILER }}"
+        ${{ env.CXX_COMPILER }} --version
+
+    - name: Install Qt via aqtinstall
+      id: install-qt
+      shell: bash
+      run: |
+        python3 -m venv ${{ github.action_path }}/python-venv
+        source ${{ github.action_path }}/python-venv/bin/activate
+        pip install -U pip
+        pip install -U aqtinstall
+
+    - name: Clone fcitx5 and fcitx5-qt
       shell: bash
       run: |
         git clone https://github.com/fcitx/fcitx5.git --depth 1 ${{ github.action_path }}/fcitx5
