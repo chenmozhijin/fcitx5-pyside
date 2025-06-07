@@ -48,6 +48,10 @@ runs:
           echo "arch=gcc_arm64" >> $GITHUB_OUTPUT
         fi
 
+    - name: Install GCC 13
+      shell: bash
+      if: true == false
+      run: |
         echo "==> Checking and installing GCC 13..."
         GCC_MAJOR_VERSION=$(gcc --version | grep -oP '(?<=^gcc \(.*\)\s)[0-9]+' | head -1 || echo "0")
         echo "-> Current GCC major version: $GCC_MAJOR_VERSION"
